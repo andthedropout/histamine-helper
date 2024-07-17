@@ -23,7 +23,7 @@ class ChatModel: ObservableObject, Identifiable, Codable {
     // Update this to your proxy endpoint
     private let location = "https://thedropout.club/api/openai_proxy"
     
-    private let sharedSecretKey: String
+    private let sharedSecretKey: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -39,15 +39,24 @@ class ChatModel: ObservableObject, Identifiable, Codable {
         self.isSending = isSending
         self.title = title
         self.date = date
+        self.maxMessagesPerDay = 10
+        self.currentDayMessageCount = 0
+        self.lastMessageDate = nil
+        self.maxMessagesReached = false
+
+        // Initialize sharedSecretKey
+        var secretKey: String? = nil
 
         // Load the shared secret key from Config.plist
         if let path = Bundle.main.path(forResource: "Config", ofType: "plist"),
            let config = NSDictionary(contentsOfFile: path) as? [String: Any],
-           let secretKey = config["SharedSecretKey"] as? String {
-            self.sharedSecretKey = secretKey
+           let key = config["SharedSecretKey"] as? String {
+            secretKey = key
         } else {
-            fatalError("SharedSecretKey not found in Config.plist")
+            print("Warning: SharedSecretKey not found in Config.plist")
         }
+
+        self.sharedSecretKey = secretKey
     }
 
     required init(from decoder: Decoder) throws {
@@ -57,6 +66,23 @@ class ChatModel: ObservableObject, Identifiable, Codable {
         isSending = try container.decode(Bool.self, forKey: .isSending)
         title = try container.decodeIfPresent(String.self, forKey: .title)
         date = try container.decode(Date.self, forKey: .date)
+        
+        // Initialize other properties with default values
+        maxMessagesPerDay = 10
+        currentDayMessageCount = 0
+        lastMessageDate = nil
+        maxMessagesReached = false
+        
+        // Initialize sharedSecretKey
+        var secretKey: String? = nil
+        if let path = Bundle.main.path(forResource: "Config", ofType: "plist"),
+           let config = NSDictionary(contentsOfFile: path) as? [String: Any],
+           let key = config["SharedSecretKey"] as? String {
+            secretKey = key
+        } else {
+            print("Warning: SharedSecretKey not found in Config.plist")
+        }
+        sharedSecretKey = secretKey
     }
 
     func encode(to encoder: Encoder) throws {
@@ -304,7 +330,7 @@ struct JSON {
 
 // Modify ConnectionRequest to work with the proxy
 extension ConnectionRequest {
-    func fetchData(_ urlString: String, parameters: [String: Any], sharedSecretKey: String, completion: @escaping (Data?, String?) -> Void) {
+    func fetchData(_ urlString: String, parameters: [String: Any], sharedSecretKey: String?, completion: @escaping (Data?, String?) -> Void) {
         guard let url = URL(string: urlString) else {
             completion(nil, "Invalid URL")
             return
@@ -315,7 +341,9 @@ extension ConnectionRequest {
         
         let boundary = "Boundary-\(UUID().uuidString)"
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        request.setValue(sharedSecretKey, forHTTPHeaderField: "X-Secret-Key")
+        if let sharedSecretKey = sharedSecretKey {
+            request.setValue(sharedSecretKey, forHTTPHeaderField: "X-Secret-Key")
+        }
         
         let body = createMultipartFormData(parameters: parameters, boundary: boundary)
         request.httpBody = body

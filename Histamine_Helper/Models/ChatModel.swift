@@ -15,7 +15,7 @@ class ChatModel: ObservableObject, Identifiable, Codable {
     @Published var isSending: Bool = false
     @Published var title: String? = nil
     @Published var date: Date
-    @Published var maxMessagesPerDay: Int = 10
+    @Published var maxMessagesPerDay: Int = 5
     @Published var currentDayMessageCount: Int = 0
     @Published var lastMessageDate: Date?
     @Published var maxMessagesReached: Bool = false
@@ -113,7 +113,7 @@ class ChatModel: ObservableObject, Identifiable, Codable {
         let messages = self.messages + [ChatMessage(role: .user, message: titlePrompt)]
         
         let parameters: [String: Any] = [
-            "model": "gpt-3.5-turbo",
+            "model": "gpt-4o-mini",
             "messages": messages.map { ["role": $0.role.rawValue, "content": $0.message ?? ""] }
         ]
         
